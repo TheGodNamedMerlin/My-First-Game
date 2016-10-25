@@ -1,0 +1,5 @@
+LEFT:pg.k_a
+RIGHT:pg.k_d
+UP:pg.k_w
+DOWN:pg.k_s
+SCREEN:None|FULLSCREEN
