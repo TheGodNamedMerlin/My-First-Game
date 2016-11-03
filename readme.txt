@@ -1,5 +1,9 @@
-Press 2 to change to the gameplay state
+The controls are:
 
-press 3 to change level (currently only 1-3 for testing purposes)
+WASD = movement
 
-press 4 to goto MainMenu
+Left click = attack
+
+Mousemovement = position
+
+1, 2 and 3 = change items

@@ -18,12 +18,13 @@ class Current_state(object):
         #event control
         self.event = None
 
-        #player control
 
-        self.player = Player_Sprite.Player((500,500))
 
         #level control
-        self.current_level, self.level_terrain = world.get_level_data(save_data[0][1])
+        self.current_level, self.level_terrain, self.mobs, self.playerPos, self.finishPoint, self.items = world.get_level_data(save_data[0][1])
+
+        #player control
+        self.player = Player_Sprite.Player(self.playerPos)
 
         #image control
         self.background_images = background_images
@@ -33,7 +34,7 @@ class Current_state(object):
         self.old_state = self.state
         self.state = state
         try:
-            self.state.give_gameplay_data(self.level_terrain, self.player, self.current_background_image)
+            self.state.give_gameplay_data(self.level_terrain, self.player, self.current_background_image, self.mobs, self.current_level, self.finishPoint, self.items)
 
         except:
             pass
@@ -45,8 +46,8 @@ class Current_state(object):
     def update_event(self, event):
         self.event = event
 
-    def get_events(self):
-        self.state.get_events(self.event)
+    def get_events(self, state):
+        self.state.get_events(self.event, state)
 
     def update(self, clock):
         self.state.update(clock)
@@ -55,46 +56,104 @@ class Current_state(object):
         self.state.render(window)
 
     def reload(self, level):
-        print("reloading state and changing level to " + str(level))
-        self.current_level, self.level_terrain = world.get_level_data(level)
-        self.current_background_image = self.background_images[level]
         try:
-            self.state.give_gameplay_data(self.level_terrain, self.player, self.current_background_image)
+            self.current_level, self.level_terrain, self.mobs, self.playerPos, self.finishPoint, self.items = world.get_level_data(level)
+            self.current_background_image = self.background_images[level]
+            self.player = Player_Sprite.Player(self.playerPos)
+            try:
+                self.state.give_gameplay_data(self.level_terrain, self.player, self.current_background_image, self.mobs, self.current_level, self.finishPoint, self.items)
 
+            except:
+                pass
         except:
-            pass
+            self.state = MainMenu()
 
 class game_play(object):
 
     def __init__(self):
-        print("Game_play State Loaded")
         self.hotBar = pg.image.load("data/resources/images/hotBar.png").convert_alpha()
+        self.cursor = pg.image.load("data/resources/images/cursor.png").convert_alpha()
+        self.hotBarSelector = pg.image.load("data/resources/images/hotBarSelector.png").convert_alpha()
+        self.item = 0
 
-    def give_gameplay_data(self, level_terrain, player, current_background_image):
-        self.level_terrain, self.player, self.background_image = level_terrain, player, current_background_image
+        self.oneWay = True
+
+        self.dead = False
+
+        pg.mouse.set_visible(False)
+
+        self.deathScreen = pg.image.load("data/resources/images/deathScreen.png").convert_alpha()
+
+    def give_gameplay_data(self, level_terrain, player, current_background_image, mobs, currentLevel, finshPoint, items):
+        self.level_terrain, self.player, self.background_image, self.mobs, self.currentLevel, self.finshPoint, self.items = level_terrain, player, current_background_image, mobs, currentLevel, finshPoint, items
 
 
-    def get_events(self, event):
-        pass
+    def get_events(self, event, state):
+        if event.type == pg.KEYDOWN:
+            if event.key == pg.K_1:
+                self.item = 0
+            elif event.key == pg.K_2:
+                self.item = 1
+            elif event.key == pg.K_3:
+                self.item = 2
+
+            elif event.key == pg.K_r:
+                self.dead = False
+                state.reload(self.currentLevel)
+
+        if self.oneWay:
+            self.state = state
+            self.oneWay = False
 
     def update(self, clock):
         self.dT = clock.get_time()
-        pressed = pg.key.get_pressed()
-        mousePos = pg.mouse.get_pos()
-        self.player.update(mousePos, pressed, self.dT, self.level_terrain)
+        self.pressed = pg.key.get_pressed()
+        self.mousePos = pg.mouse.get_pos()
+        self.mousePress = pg.mouse.get_pressed()
+        self.player.update(self.mousePos, self.pressed, self.dT, self.level_terrain, self.item, self.mousePress, self.mobs)
+        self.mobs.update(self.player)
+        self.pickUpItem()
+        self.Die()
+        if pg.sprite.collide_rect(self.player, self.finshPoint):
+            self.state.reload(self.currentLevel+1)
+
 
     def render(self, window):
-
         window.blit(self.background_image, (0,0))
         self.level_terrain.draw(window)
-        self.player.draw(window)
-        window.blit(self.hotBar,(557,680 ))
+        self.mobs.draw(window)
+        self.items.draw(window)
+
+        if self.dead:
+            window.blit(self.deathScreen, (640-295, 360-33))
+
+        else:
+            self.player.draw(window)
+            window.blit(self.cursor, (self.mousePos[0]-16, self.mousePos[1]-16))
+            window.blit(self.hotBar,(539,650))
+            window.blit(self.hotBarSelector, (540+(self.item*67), 651))
+            self.player.drawItems(window)
+
+    def Die(self):
+        collision = pg.sprite.spritecollide(self.player, self.mobs, False)
+        if collision:
+            if self.player.attacking():
+                for mob in collision:
+                    self.mobs.remove(mob)
+            else:
+                self.dead = True
+
+    def pickUpItem(self):
+        collision = pg.sprite.spritecollide(self.player, self.items, False)
+        for item in collision:
+            self.player.changeItem(item.returnItem())
+            self.items.remove(item)
+
 
 
 class MainMenu(object):
 
     def __init__(self):
-        print("MainMenu State Loaded")
 
         self.background01 = pg.image.load("data/resources/images/menuBackground.png").convert_alpha()
         self.background02 = pg.transform.flip(self.background01, True, False)
@@ -115,7 +174,7 @@ class MainMenu(object):
         self.currentMode = "main"
         # "main", "options", "controls"
         self.change_mode()
-
+        pg.mouse.set_visible(True)
 
     def reloadOptions(self):
         self.options = Load.load_options()
@@ -185,7 +244,7 @@ class MainMenu(object):
                     if mouse[1] < self.pos[3][0]:
                         return True
 
-    def get_events(self, event):
+    def get_events(self, event, state):
         if event.type == pg.MOUSEBUTTONDOWN:
             mouse = pg.mouse.get_pos()
 
@@ -193,39 +252,34 @@ class MainMenu(object):
 
                 if button.whatButton() == 0:
                     if self.buttonClick(button, mouse):
-                        print("Play was Clicked")
+                        state.change_state(game_play())
+
 
                 elif button.whatButton() == 1:
                     if self.buttonClick(button, mouse):
-                        print("Options was Clicked")
                         self.currentMode = "options"
                         self.change_mode()
 
                 elif button.whatButton() == 2:
                     if self.buttonClick(button, mouse):
-                        print("Controls was Clicked")
                         self.reloadOptions()
                         self.currentMode = "controls"
                         self.change_mode()
 
                 elif button.whatButton() == 3:
                     if self.buttonClick(button, mouse):
-                        print("Quit has been pressed")
                         pg.quit()
                         sys.exit()
 
                 elif button.whatButton() == 6:
                     if self.buttonClick(button, mouse):
-                        print("Back was Clicked")
                         self.currentMode = "main"
                         self.change_mode()
 
                 elif button.whatButton() == 15:
                     if self.buttonClick(button, mouse):
-                        print("Back was Clicked")
                         f = open("data/resources/options.txt")
                         dirname = os.path.realpath(f.name)
-                        print(dirname)
                         subprocess.call("explorer "+dirname, shell=True)
                         f.close()
                         self.currentMode = "main"

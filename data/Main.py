@@ -7,22 +7,12 @@ def get_events(current_state):
         if event.type == pg.QUIT:
             return False
 
-        #this is only for testing purposes
-        if event.type == pg.KEYDOWN:
-            if event.key == pg.K_2:
-                current_state.change_state(States.game_play())
-            if event.key == pg.K_3:
-                current_state.reload(int(input("What level would you like to goto\n>  ")))
-
-            if event.key == pg.K_4:
-                current_state.change_state(States.MainMenu())
-        #end of testing purposes
         current_state.update_event(event)
 
 
 
 
-    current_state.get_events()
+    current_state.get_events(current_state)
     return True
 
 
@@ -74,5 +64,4 @@ def run():
 
     pg.quit()
     sys.exit()
-
 
